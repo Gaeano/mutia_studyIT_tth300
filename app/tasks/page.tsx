@@ -13,73 +13,130 @@ interface Task {
     dueDate: string;
     isCompleted: boolean;
 }
-// default sort is by due date ascending
-//if completed it will go to the bottom of the list
+
+const API_URL = 'http://localhost:5000/api/tasks';
 
 export default function TasksPage() {
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const [tasks, setTasks] = useState([] as Task[]);
     const [isFormOpen, setFormOpen] = useState(false);
-    const [sortOption, setSortOption] = useState<string>('dueDateAsc');
+    const [sortOption, setSortOption] = useState('dueDateAsc');
 
+    // 1. Load all tasks from the Node.js backend
     useEffect(() => {
-        const savedTasks = localStorage.getItem("planner_tasks");
-        if (savedTasks) {
-            setTasks(JSON.parse(savedTasks));
+        async function fetchTasks() {
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    const formattedTasks: Task[] = data.map((task) => ({
+                        id: String(task.id),
+                        title: String(task.title),
+                        subject: String(task.subject ?? ''),
+                        dueDate: String(task.dueDate),
+                        isCompleted: Boolean(task.isCompleted),
+                    }));
+                    setTasks(formattedTasks);
+                }
+            } catch (err) {
+                console.warn('Could not load tasks from backend:', err);
+            }
         }
+        fetchTasks();
     }, []);
 
-    const handleAddTask = (newTaskData: { title: string; subject: string; dueDate: string }) => {
-        const newTask: Task = {
-            id: crypto.randomUUID(),
-            title: newTaskData.title,
-            subject: newTaskData.subject,
-            dueDate: newTaskData.dueDate,
-            isCompleted: false
-        };
+    // 2. Add a new task via POST
+    const handleAddTask = async (newTaskData: { title: string; subject: string; dueDate: string }) => {
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTaskData),
+            });
 
-        const updatedTasks = [...tasks, newTask];
-        setTasks(updatedTasks);
-        localStorage.setItem("planner_tasks", JSON.stringify(updatedTasks));
+            if (!res.ok) return;
+            const createdTask = await res.json();
+
+            const newTask: Task = {
+                id: String(createdTask.id),
+                title: String(createdTask.title),
+                subject: String(createdTask.subject ?? ''),
+                dueDate: String(createdTask.dueDate),
+                isCompleted: Boolean(createdTask.isCompleted),
+            };
+
+            setTasks((prev) => [...prev, newTask]);
+        } catch (err) {
+            console.warn('Could not add task:', err);
+        }
     };
 
-    const handleDeleteTask = (idToDelete: string) => {
-        const updatedTasks = tasks.filter((task) => task.id !== idToDelete);
-        setTasks(updatedTasks);
-        localStorage.setItem("planner_tasks", JSON.stringify(updatedTasks));
+    // 3. Delete a task via DELETE
+    const handleDeleteTask = async (idToDelete: string) => {
+        try {
+            const res = await fetch(API_URL, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: Number(idToDelete) }),
+            });
+
+            if (!res.ok) return;
+            setTasks((prev) => prev.filter((task) => task.id !== idToDelete));
+        } catch (err) {
+            console.warn('Could not delete task:', err);
+        }
     };
 
-    const handleToggleComplete = (idToToggle: string) => {
-        const updatedTasks = tasks.map((task) => {
-            if (task.id === idToToggle) {
-                return { ...task, isCompleted: !task.isCompleted };
-            }
-            return task;
-        });
+    // 4. Toggle task completion status via PATCH
+    const handleToggleComplete = async (idToToggle: string) => {
+        const targetTask = tasks.find((task) => task.id === idToToggle);
+        if (!targetTask) return;
 
-        setTasks(updatedTasks);
-        localStorage.setItem("planner_tasks", JSON.stringify(updatedTasks));
+        const newStatus = !targetTask.isCompleted;
+
+        try {
+            const res = await fetch(API_URL, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: Number(idToToggle),
+                    isCompleted: newStatus,
+                }),
+            });
+
+            if (!res.ok) return;
+
+            setTasks((prev) =>
+                prev.map((task) =>
+                    task.id === idToToggle ? { ...task, isCompleted: newStatus } : task
+                )
+            );
+        } catch (err) {
+            console.warn('Could not update task status:', err);
+        }
     };
 
-    const handleSortChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleSortChange = (event: { target: { value: string } }) => {
         setSortOption(event.target.value);
-    }
+    };
 
-     const sortedTasks = [...tasks].sort((a, b) => {
+    const sortedTasks = [...tasks].sort((a, b) => {
         if (a.isCompleted && !b.isCompleted) return 1;
         if (!a.isCompleted && b.isCompleted) return -1;
 
-        if (sortOption === "dueDateAsc") {
+        if (sortOption === 'dueDateAsc') {
             return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-        } else if (sortOption === "dueDateDesc"){
+        } else if (sortOption === 'dueDateDesc') {
             return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-        } else if (sortOption === 'subjectAsc'){
+        } else if (sortOption === 'subjectAsc') {
             return a.subject.localeCompare(b.subject);
-        } else if (sortOption === 'subjectDesc'){
+        } else if (sortOption === 'subjectDesc') {
             return b.subject.localeCompare(a.subject);
         }
 
         return 0;
-     });
+    });
 
     return (
         <div className="min-h-screen flex bg-black text-white relative">

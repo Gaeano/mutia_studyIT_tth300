@@ -1,77 +1,115 @@
 'use client';
-import {useState, useEffect} from 'react';
+
+import { useState, useEffect } from 'react';
 import TaskCard from '../Layout_Components/taskCard';
 import Sidebar from '../Layout_Components/sidebar';
 
-interface Task{
+interface Task {
     id: string;
     title: string;
     subject: string;
     dueDate: string;
     isCompleted: boolean;
-};
-    
+}
+
+const API_URL = 'http://localhost:5000/api/tasks';
+
 export default function Dashboard() {
+    const [username, setUsername] = useState('');
+    const [tasks, setTasks] = useState([] as Task[]);
+    const [sortOption, setSortOption] = useState('dueDateAsc');
 
-const [username, setUsername] = useState<string>('');
-const [tasks, setTasks] = useState<Task[]>([]);
-const [sortOption, setSortOption] = useState('dueDateAsc');
+    useEffect(() => {
+        const storedName = localStorage.getItem('planner_username');
+        if (storedName) {
+            setUsername(storedName);
+        }
 
+        async function fetchTasks() {
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) return;
 
-useEffect(() => {
-    const storedName = localStorage.getItem("planner_username");
-    if (storedName){
-        setUsername(storedName);
-    }
-
-    const savedTasks = localStorage.getItem("planner_tasks");
-    if (savedTasks){
-        setTasks(JSON.parse(savedTasks));
-    }
-}, []);
-
-
-const handleDeleteTask = (idToDelete: string) => {
-    const updatedTasks = tasks.filter((task) => task.id !== idToDelete);
-    
-    setTasks(updatedTasks);
-    
-    localStorage.setItem("planner_tasks", JSON.stringify(updatedTasks));
-};
-
-const handleToggleComplete = (idToToggle: string) => {
-    const completedTasks = localStorage.getItem("planner_tasks");
-    if (completedTasks){
-        const updatedTasks = tasks.map((task) => {
-            if (task.id === idToToggle){
-                return {...task, isCompleted: !task.isCompleted};
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    const formattedTasks: Task[] = data.map((task) => ({
+                        id: String(task.id),
+                        title: String(task.title),
+                        subject: String(task.subject ?? ''),
+                        dueDate: String(task.dueDate),
+                        isCompleted: Boolean(task.isCompleted),
+                    }));
+                    setTasks(formattedTasks);
+                }
+            } catch (err) {
+                console.warn('Could not load tasks from backend:', err);
             }
-            return task;
-        });
-        setTasks(updatedTasks);
-        localStorage.setItem("planner_tasks", JSON.stringify(updatedTasks));
-        localStorage.setItem("planner_completed", JSON.stringify(updatedTasks.filter(task => task.isCompleted)));
-    }
-};
+        }
 
- const sortedTasks = [...tasks].sort((a, b) => {
+        fetchTasks();
+    }, []);
+
+    const handleDeleteTask = async (idToDelete: string) => {
+        try {
+            const res = await fetch(API_URL, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: Number(idToDelete) }),
+            });
+
+            if (!res.ok) return;
+            setTasks((prev) => prev.filter((task) => task.id !== idToDelete));
+        } catch (err) {
+            console.warn('Could not delete task:', err);
+        }
+    };
+
+    const handleToggleComplete = async (idToToggle: string) => {
+        const targetTask = tasks.find((task) => task.id === idToToggle);
+        if (!targetTask) return;
+
+        const newStatus = !targetTask.isCompleted;
+
+        try {
+            const res = await fetch(API_URL, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: Number(idToToggle),
+                    isCompleted: newStatus,
+                }),
+            });
+
+            if (!res.ok) return;
+
+            setTasks((prev) =>
+                prev.map((task) =>
+                    task.id === idToToggle ? { ...task, isCompleted: newStatus } : task
+                )
+            );
+        } catch (err) {
+            console.warn('Could not update task status:', err);
+        }
+    };
+
+    const sortedTasks = [...tasks].sort((a, b) => {
         if (a.isCompleted && !b.isCompleted) return 1;
         if (!a.isCompleted && b.isCompleted) return -1;
 
-        if (sortOption === "dueDateAsc") {
+        if (sortOption === 'dueDateAsc') {
             return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-        } else if (sortOption === "dueDateDesc"){
+        } else if (sortOption === 'dueDateDesc') {
             return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-        } else if (sortOption === 'subjectAsc'){
-            return a.title.localeCompare(b.title);
-        } else if (sortOption === 'subjectDesc'){
-            return b.title.localeCompare(a.title);
+        } else if (sortOption === 'subjectAsc') {
+            return a.subject.localeCompare(b.subject);
+        } else if (sortOption === 'subjectDesc') {
+            return b.subject.localeCompare(a.subject);
         }
 
         return 0;
-     });
+    });
 
-return (
+    return (
     <div className="min-h-screen flex bg-black text-white">
     <Sidebar />
 

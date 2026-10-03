@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 29, 2026 at 10:43 AM
+-- Generation Time: Oct 03, 2026 at 04:23 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -42,8 +42,7 @@ CREATE TABLE `tasks` (
 --
 
 INSERT INTO `tasks` (`task_id`, `subject`, `task_title`, `status`, `due_date`, `created_at`, `updated_at`) VALUES
-(1, 'dsa', 'study dsa', 'Not Started', '2026-10-01', '2026-09-29 08:39:50', '2026-09-29 08:39:50'),
-(2, 'integrative programming', 'study integrative', 'Not Started', '2026-10-06', '2026-09-29 08:40:09', '2026-09-29 08:40:09');
+(2, 'dsa', 'study dsa', 'Not Started', '2026-10-17', '2026-09-29 08:40:09', '2026-10-03 14:18:50');
 
 --
 -- Indexes for dumped tables

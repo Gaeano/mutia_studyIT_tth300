@@ -57,15 +57,50 @@ app.post('/api/tasks', async (req, res) => {
   }
 });
 
-//update status
+//edit task
 app.patch('/api/tasks', async (req, res) => {
   try {
-    const { id, isCompleted } = req.body;
-    const status = isCompleted ? 'Completed' : 'Not Started';
+    const { id, title, subject, dueDate, isCompleted, status } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: 'Task id is required' });
+    }
+
+    const updates = [];
+    const values = [];
+
+    if (title !== undefined) {
+      updates.push('task_title = ?');
+      values.push(title);
+    }
+
+    if (subject !== undefined) {
+      updates.push('subject = ?');
+      values.push(subject);
+    }
+
+    if (dueDate !== undefined) {
+      updates.push('due_date = ?');
+      values.push(dueDate);
+    }
+
+    if (isCompleted !== undefined) {
+      updates.push('status = ?');
+      values.push(isCompleted ? 'Completed' : 'Not Started');
+    } else if (status !== undefined) {
+      updates.push('status = ?');
+      values.push(status);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(id);
 
     await db.execute(
-      'UPDATE tasks SET status = ? WHERE task_id = ?',
-      [status, id]
+      `UPDATE tasks SET ${updates.join(', ')} WHERE task_id = ?`,
+      values
     );
 
     res.json({ success: true });
